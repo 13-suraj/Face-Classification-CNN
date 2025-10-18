@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Face Classification Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: system-ui, sans-serif; }
+    body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+    header { margin-bottom: 1.5rem; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .preview { width: 100%; aspect-ratio: 1/1; object-fit: cover; border: 1px dashed #999; border-radius: 8px; }
+    .output { font-size: 1rem; }
+    button { padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .status { color: #555; font-size: 0.95rem; }
+    .hidden { display: none; }
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; }
+    .prob-bar { height: 10px; background: #eee; border-radius: 6px; overflow: hidden; }
+    .prob-fill { height: 100%; background: #4a8; width: 0%; transition: width 0.3s ease; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Face Classification Demo</h1>
+    <p>Upload an image and view the predicted class and confidence from your trained model.</p>
+  </header>
+
+  <section class="card">
+    <h2>Upload image</h2>
+    <input id="fileInput" type="file" accept="image/*" />
+    <p class="status" id="fileStatus">No image selected.</p>
+    <div class="row">
+      <div>
+        <img id="preview" class="preview" alt="Image preview" />
+      </div>
+      <div>
+        <h3>Prediction</h3>
+        <div class="kv">
+          <div><strong>Class:</strong></div>
+          <div id="predClass" class="output">—</div>
+
+          <div><strong>Confidence:</strong></div>
+          <div id="predConf" class="output">—</div>
+        </div>
+
+        <div class="prob-bar" aria-label="Confidence bar">
+          <div id="probFill" class="prob-fill"></div>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <button id="predictBtn" disabled>Classify</button>
+          <span id="predictStatus" class="status"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Notes</h2>
+    <ul>
+      <li><strong>Endpoint:</strong> This page posts the image to <code>/predict</code>. Adjust the URL if your backend differs.</li>
+      <li><strong>Expected response (JSON):</strong>
+        <pre>{
+  "class": "PersonA",
+  "confidence": 0.93,
+  "probs": {"PersonA": 0.93, "PersonB": 0.07}
+}</pre>
+      </li>
+      <li><strong>Security:</strong> For local testing only; add auth/CORS for production.</li>
+    </ul>
+  </section>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const fileStatus = document.getElementById('fileStatus');
+    const predictBtn = document.getElementById('predictBtn');
+    const predClass = document.getElementById('predClass');
+    const predConf = document.getElementById('predConf');
+    const probFill = document.getElementById('probFill');
+    const predictStatus = document.getElementById('predictStatus');
+
+    // Image preview
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) {
+        preview.src = '';
+        preview.classList.add('hidden');
+        fileStatus.textContent = 'No image selected.';
+        predictBtn.disabled = true;
+        return;
+      }
+      fileStatus.textContent = `Selected: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+      const reader = new FileReader();
+      reader.onload = e => {
+        preview.src = e.target.result;
+        preview.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+      predictBtn.disabled = false;
+      predClass.textContent = '—';
+      predConf.textContent = '—';
+      probFill.style.width = '0%';
+      predictStatus.textContent = '';
+    });
+
+    // Call backend /predict
+    predictBtn.addEventListener('click', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+
+      predictBtn.disabled = true;
+      predictStatus.textContent = 'Classifying…';
+
+      try {
+        const form = new FormData();
+        form.append('file', file); // backend should read "file" from form-data
+
+        // Adjust the URL if needed (e.g., http://localhost:8000/predict)
+        const res = await fetch('/predict', { method: 'POST', body: form });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        // Expected keys: class, confidence, probs
+        const cls = data.class ?? 'Unknown';
+        const conf = Number(data.confidence ?? 0);
+        predClass.textContent = cls;
+        predConf.textContent = `${(conf * 100).toFixed(1)}%`;
+        probFill.style.width = `${Math.max(0, Math.min(100, conf * 100))}%`;
+
+        // Optional: show per-class probabilities if present
+        if (data.probs && typeof data.probs === 'object') {
+          const best = Object.entries(data.probs).sort((a, b) => b[1] - a[1])[0];
+          predClass.textContent = best ? best[0] : cls;
+          predConf.textContent = best ? `${(best[1] * 100).toFixed(1)}%` : `${(conf * 100).toFixed(1)}%`;
+          probFill.style.width = best ? `${(best[1] * 100).toFixed(1)}%` : `${(conf * 100).toFixed(1)}%`;
+        }
+
+        predictStatus.textContent = 'Done.';
+      } catch (err) {
+        console.error(err);
+        predictStatus.textContent = 'Failed to classify. Check backend URL / response format.';
+      } finally {
+        predictBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
