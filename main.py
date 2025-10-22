@@ -21,3 +21,16 @@ try:
 except Exception as e:
         logger.exception(e)
         raise e
+
+
+try:
+    training_config = config.get_training_config()
+    training = Training(config = training_config)
+    training.get_base_model()
+    training.train_valid_generator()
+    training.train(
+        callback_list = callback_list
+    )
+
+except Exception as e:
+    raise e
