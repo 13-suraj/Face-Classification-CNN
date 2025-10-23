@@ -1,6 +1,8 @@
 from src.FaceClassification import logger
 from src.FaceClassification.pipeline.stage_01_data_ingestion import DataIngestionConfigPipeline
 from src.FaceClassification.pipeline.stage_02_prepare_base_model import PrepareBaseModelPipeline
+from src.FaceClassification.pipeline.stage_03_training import ModelTrainingPipeline
+from src.FaceClassification.pipeline.stage_04_model_evaluation import ModelEvaluationPipeline
 
 STAGE_NAME = "Data Ingestion Stage"
 try:
@@ -22,15 +24,22 @@ except Exception as e:
         logger.exception(e)
         raise e
 
-
+STAGE_NAME = "Training"
 try:
-    training_config = config.get_training_config()
-    training = Training(config = training_config)
-    training.get_base_model()
-    training.train_valid_generator()
-    training.train(
-        callback_list = callback_list
-    )
-
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = ModelTrainingPipeline()
+    obj.main()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx=========x")
 except Exception as e:
+    logger.exception(e)
+    raise e
+
+STAGE_NAME = "Model Evaluation"
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = ModelEvaluationPipeline()
+    obj.main()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx=========x")
+except Exception as e:
+    logger.exception(e)
     raise e
