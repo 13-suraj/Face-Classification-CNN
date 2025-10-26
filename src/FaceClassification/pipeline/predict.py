@@ -14,12 +14,16 @@ class PredictionPipeline:
         test_image = image.img_to_array(test_image)
         test_image = np.expand_dims(test_image, axis=0) / 255.0  # normalize like training
 
-        result = np.argmax(model.predict(test_image), axis=1)
-        print("Raw prediction:", result)
+        probs = model.predict(test_image)[0]
 
-        if result[0] == 1:
-            prediction = "Subhash"
-        else:
-            prediction = "Suraj"
+        class_idx = np.argmax(probs)
+        confidence = float(probs[class_idx])
 
-        return [{"image": prediction}]
+        labels = ["Subhash", "Suraj"]
+        predicted_class = labels[class_idx]
+
+        return {
+            "class" : predicted_class,
+            "confidence" : confidence,
+            "probs" : {labels[i]: float(probs[i]) for i in range(len(labels))}
+        }
